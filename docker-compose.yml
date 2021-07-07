@@ -1,0 +1,9 @@
+version: "3.6"
+services:
+  dev:
+    build:
+      context: .
+    command:
+      - nix-shell
+    volumes:
+      - ./:/app

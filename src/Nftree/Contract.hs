@@ -1,77 +1,113 @@
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveAnyClass        #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoImplicitPrelude     #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
 
-module Nftree.Contract
-    ( Nft (..)
-    , endpoints
-    ) where
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
 
-import           Control.Monad                hiding (fmap)
-import           Data.Aeson                   (FromJSON, ToJSON)
-import           Data.Text                    (Text, pack)
-import           GHC.Generics                 (Generic)
-import           Plutus.Contract              as Contract hiding (when)
-import           Plutus.Contract.StateMachine
-import qualified PlutusTx
-import           PlutusTx.Prelude             hiding (Semigroup(..), check, unless)
-import           Ledger                       hiding (singleton)
-import           Ledger.Ada                   as Ada
-import           Ledger.Constraints           as Constraints
-import           Ledger.Typed.Tx
-import qualified Ledger.Typed.Scripts         as Scripts
-import           Ledger.Value
-import           Playground.Contract          (ToSchema)
-import           Prelude                      (Semigroup (..))
-import qualified Prelude
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+
+module Nftree.Contract where
+
+import           Control.Monad        hiding (fmap)
+import           Data.Aeson           (ToJSON, FromJSON)
+import           Data.List.NonEmpty   (NonEmpty (..))
+import           Data.Map             as Map
+import qualified Data.List            as List
+import           Data.Text            (pack, Text)
+import           GHC.Generics         (Generic)
+import           Plutus.Contract
+import qualified PlutusTx             as PlutusTx
+import           PlutusTx.Prelude     hiding (Semigroup(..), unless)
+import qualified PlutusTx.Prelude     as Plutus
+import           Ledger               hiding (singleton)
+import           Ledger.Constraints   as Constraints
+import qualified Ledger.Scripts       as Scripts
+import qualified Ledger.Typed.Scripts as Scripts hiding (validatorHash)
+import           Ledger.Value         as Value
+import           Ledger.Ada           as Ada
+import           Playground.Contract  (ensureKnownCurrencies, printSchemas, stage, printJson)
+import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
+import           Playground.Types     (KnownCurrency (..))
+import           Prelude              (IO, Semigroup (..), Show (..), String)
+import           Schema               (ToSchema)
+import           Text.Printf          (printf)
+import Control.Lens
 
 data Nft = Nft
   { nName :: !String -- review if in mint we get this two
   , nSymbol :: !String -- review if in mint
-  , nToken :: !Assetclass -- needed for statemachine? or will be generated
-  , nOwners :: [Owner]
-  , nBalances :: [Balance]
-  , nTokenApprovals  :: [TokenApproval]
-  , nOperatorApprovals  :: [OperatorApproval]
-  , nTokenURIs :: [TokenURI]
-} deriving (Show, Generic, FromJSON, ToJSON, Prelude.Eq, Prelude.Ord)
+  , nToken :: !String -- Should be AssetClass
+  , nOwners :: (Map NTokenId NAddress)
+  , nBalances :: (Map NAddress NTokenId)
+  , nTokenApprovals  :: (Map NTokenId NAddress)
+  , nOperatorApprovals  :: (Map NAddress NAddress)
+  , nTokenURIs :: Map NTokenId NUrl
+} deriving (Show, Generic, ToJSON, FromJSON)
 
-data Owner = Owner
-  { oTokenId :: !String
-  , oPubkey :: !PubKeyHash
-  }
-  deriving stock (Haskell.Eq, Haskell.Show, Generic)
-  deriving anyclass (ToJSON, FromJSON)
+type NAddress = String
+type NTokenId = Integer
+type NUrl = String
 
-data Balance = Balance
-  { bOwner :: !PubKeyHash
-  , bCount :: !Integer
-  }
-  deriving stock (Haskell.Eq, Haskell.Show, Generic)
-  deriving anyclass (ToJSON, FromJSON)
 
-data TokenApproval = TokenApproval
-  { taTokenId :: !String
-  , taAddress :: !PubKeyHash
-  }
-  deriving stock (Haskell.Eq, Haskell.Show, Generic)
-  deriving anyclass (ToJSON, FromJSON)
+-- data NOwnwers = NOwnwers { _vals :: Map.Map NTokenId NAddress } deriving (Show, Eq, Ord)
 
-data OperatorApproval = OperatorApproval
-  { oaOwnerAddress :: !PubKeyHash
-  , oaOperatorAddress :: !PubKeyHash
-  }
-  deriving stock (Haskell.Eq, Haskell.Show, Generic)
-  deriving anyclass (ToJSON, FromJSON)
 
-data TokenURI :: String
+
+-- data Owner = Owner
+--   { oTokenId :: !String
+--   , oPubkey :: !String
+--   } deriving (Show, Generic, ToJSON, FromJSON)
+
+-- data Balance = Balance
+--   { bOwner :: !String
+--   , bCount :: !Integer
+--   } deriving (Show, Generic, ToJSON, FromJSON)
+
+-- data TokenApproval = TokenApproval
+--   { taTokenId :: !String
+--   , taAddress :: !String
+--   } deriving (Show, Generic, ToJSON, FromJSON)
+
+-- data OperatorApproval = OperatorApproval
+--   { oaOwnerAddress :: !String
+--   , oaOperatorAddress :: !String
+--   } deriving (Show, Generic, ToJSON, FromJSON)
+
+-- data TokenURI = TokenURI { tuTokenId :: !String, tuURI :: !String } deriving (Show, Generic, ToJSON, FromJSON)
+
+initialState :: NAddress -> [(NTokenId, NUrl)] -> Nft
+initialState owner tokens = 
+    Nft { 
+        nName = "nName" 
+      , nSymbol = "!String" -- review if in mint
+      , nToken = "AssetClass" -- needed for statemachine? or will be generated
+      , nOwners = tokenOwners
+      , nBalances = Map.fromList [(owner, length tokens)]
+      , nTokenApprovals  = Map.fromList []
+      , nOperatorApprovals  = Map.fromList []
+      , nTokenURIs = Map.fromList tokens
+    }
+  where
+    tokenOwners = Map.fromList $ List.map (\(tokenId, _url) -> (tokenId, owner)) tokens
+
+            
+
+addTokenApproval :: Nft -> NTokenId -> NAddress -> Nft
+addTokenApproval nft@Nft{nTokenApprovals = old } tokenId approved = nft { nTokenApprovals = Map.insert tokenId approved old}
+
+addOperatorApproval :: Nft -> NAddress -> NAddress -> Nft
+addOperatorApproval nft@Nft{nOperatorApprovals = old } owner approved = nft { nOperatorApprovals = Map.insert owner approved old}
+
 

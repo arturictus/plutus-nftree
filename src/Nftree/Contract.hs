@@ -60,33 +60,6 @@ type NAddress = String
 type NTokenId = Integer
 type NUrl = String
 
-
--- data NOwnwers = NOwnwers { _vals :: Map.Map NTokenId NAddress } deriving (Show, Eq, Ord)
-
-
-
--- data Owner = Owner
---   { oTokenId :: !String
---   , oPubkey :: !String
---   } deriving (Show, Generic, ToJSON, FromJSON)
-
--- data Balance = Balance
---   { bOwner :: !String
---   , bCount :: !Integer
---   } deriving (Show, Generic, ToJSON, FromJSON)
-
--- data TokenApproval = TokenApproval
---   { taTokenId :: !String
---   , taAddress :: !String
---   } deriving (Show, Generic, ToJSON, FromJSON)
-
--- data OperatorApproval = OperatorApproval
---   { oaOwnerAddress :: !String
---   , oaOperatorAddress :: !String
---   } deriving (Show, Generic, ToJSON, FromJSON)
-
--- data TokenURI = TokenURI { tuTokenId :: !String, tuURI :: !String } deriving (Show, Generic, ToJSON, FromJSON)
-
 initialState :: NAddress -> [(NTokenId, NUrl)] -> Nft
 initialState owner tokens = 
     Nft { 
@@ -109,5 +82,10 @@ addTokenApproval nft@Nft{nTokenApprovals = old } tokenId approved = nft { nToken
 
 addOperatorApproval :: Nft -> NAddress -> NAddress -> Nft
 addOperatorApproval nft@Nft{nOperatorApprovals = old } owner approved = nft { nOperatorApprovals = Map.insert owner approved old}
+
+-- transferToken :: Nft -> NTokenId -> NAddress -> Nft
+-- transferToken nft@Nft{nOwners = owners} tokenId address do
+
+
 
 
